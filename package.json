@@ -1,8 +1,8 @@
 {
-  "name": "ggh-scripts",
+  "name": "google-github-actions-scripts",
   "type": "module",
   "version": "0.0.1",
-  "description": "Google GitHub Actions team helper scripts",
+  "description": "Google GitHub Actions team scripts",
   "main": "main.mjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
