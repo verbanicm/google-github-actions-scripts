@@ -46,61 +46,66 @@ export default async function deps(subcommands = []) {
 
   await Promise.all(
     targetRepos.map(async (repo) =>
+      // within creates a new async context from zx library
       within(async () => {
-        console.log(`[${COMMAND}][${repo.name}] started`);
+        try {
+          console.log(`[${COMMAND}][${repo.name}] started`);
 
-        cd(reposPath);
-        await $`git clone ${repo.sshUrl}`;
-        cd(repo.name);
-        await $`git pull origin main`;
-        await $`git checkout -b ${branchName}`;
+          cd(reposPath);
+          await $`git clone ${repo.sshUrl}`;
+          cd(repo.name);
+          await $`git pull origin main`;
+          await $`git checkout -b ${branchName}`;
 
-        if (!fs.existsSync("package.json")) {
-          console.log(
-            yellow(
-              `[${COMMAND}][${repo.name}] package.json not found, skipping...`
-            )
-          );
-          return;
+          if (!fs.existsSync("package.json")) {
+            console.log(
+              yellow(
+                `[${COMMAND}][${repo.name}] package.json not found, skipping...`
+              )
+            );
+            return;
+          }
+
+          await $`ncu -u`;
+          await $`npm install`;
+
+          const status = await $`git status -s --porcelain`;
+          if (status.stdout.length == 0) {
+            console.log(
+              blue(
+                `[${COMMAND}][${repo.name}] no dependency updates found, skipping...`
+              )
+            );
+            return;
+          }
+
+          console.log(`[${COMMAND}][${repo.name}] updating dependencies...`);
+
+          if (!dryRun) {
+            await $`git add .`;
+            await $`git commit --message=${commitMessage}`;
+            await $`git push origin ${branchName} --force`;
+
+            await sleep(1500);
+
+            const prStatus =
+              await $`gh pr create --base="main" --head="${branchName}" --fill`;
+            prsCreated.push(
+              `[${COMMAND}][${repo.name}] PR Created - ${prStatus.stdout}`
+            );
+          }
+
+          console.log(green(`[${COMMAND}][${repo.name}] completed`));
+        } catch (err) {
+          console.log(red(`[${COMMAND}][${repo.name}] failed: `), err);
         }
-
-        await $`ncu -u`;
-        await $`npm install`;
-
-        const status = await $`git status -s --porcelain`;
-        if (status.stdout.length == 0) {
-          console.log(
-            blue(
-              `[${COMMAND}][${repo.name}] no dependency updates found, skipping...`
-            )
-          );
-          return;
-        }
-
-        console.log(`[${COMMAND}][${repo.name}] updating dependencies...`);
-
-        if (!dryRun) {
-          await $`git add .`;
-          await $`git commit --message=${commitMessage}`;
-          await $`git push origin ${branchName} --force`;
-
-          await sleep(1500);
-
-          const prStatus =
-            await $`gh pr create --base="main" --head="${branchName}" --fill`;
-          prsCreated.push(
-            `[${COMMAND}][${repo.name}] PR Created - ${prStatus.stdout}`
-          );
-        }
-
-        console.log(green(`[${COMMAND}][${repo.name}] completed`));
       })
     )
   );
 
   if (prsCreated.length) {
     console.log("\n");
-    prsCreated.forEach(console.log);
+    prsCreated.forEach((pr) => console.log);
     console.log("\n");
   }
 

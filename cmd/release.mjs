@@ -38,12 +38,17 @@ export default async function release() {
 
   await Promise.all(
     targetRepos.map(async (repo) =>
+      // within creates a new async context from zx library
       within(async () => {
-        console.log(`[${COMMAND}][${repo.name}] started`);
-        if (!dryRun) {
-          await $`gh workflow run draft-release.yml --repo="${repo.nameWithOwner}" --ref="${branch}" --raw-field="version_strategy=${strategy}"`;
+        try {
+          console.log(`[${COMMAND}][${repo.name}] started`);
+          if (!dryRun) {
+            await $`gh workflow run draft-release.yml --repo="${repo.nameWithOwner}" --ref="${branch}" --raw-field="version_strategy=${strategy}"`;
+          }
+          console.log(green(`[${COMMAND}][${repo.name}] completed`));
+        } catch (err) {
+          console.log(red(`[${COMMAND}][${repo.name}] failed: `), err);
         }
-        console.log(green(`[${COMMAND}][${repo.name}] completed`));
       })
     )
   );
